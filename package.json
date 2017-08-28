@@ -60,6 +60,7 @@
     "isomorphic-fetch": "^2.2.1",
     "lodash": "^4.17.2",
     "neon-js": "git+https://github.com/CityOfZion/neon-js.git#1.0.1",
+    "ledger-node-js-api": "git+https://github.com/coranos/ledger-node-js-api.git",
     "qrcode": "^0.8.2",
     "react": "^15.0.2",
     "react-ace": "^5.0.1",

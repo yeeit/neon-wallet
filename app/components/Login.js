@@ -8,8 +8,27 @@ import { getWIFFromPrivateKey } from 'neon-js';
 const logo = require('../images/neon-logo2.png');
 
 const onWifChange = (dispatch, value) => {
-  // TODO: changed back to only WIF login for now, getting weird errors with private key hex login
+  // TODO: changed back to only WIF login for now, getting weird errors with
+	// private key hex login
   dispatch(login(value));
+};
+
+const showDeviceInfo = (dispatch, value) => {
+	process.stdout.write("showDeviceInfo called\n");
+	const comm_node = require('ledger-node-js-api');
+	process.stdout.write("\t" + "comm_node" + "\t" + comm_node + "\n");
+	comm_node.create_async()
+		.then(function(comm) {
+			var deviceInfo = comm.device.getDeviceInfo();
+			process.stdout.write("Success:\n");
+			process.stdout.write(deviceInfo + "\n");
+			window.getElementById("ledger_detection").innerHTML = 'Success: ' +  deviceInfo;
+		})
+		.catch(function(reason) {
+			process.stdout.write("An error occured:\n");
+			process.stdout.write(reason + "\n");
+			window.getElementById("ledger_detection").innerHTML = 'An error occured: ' +  reason;
+		});
 };
 
 let Login = ({ dispatch, loggedIn, wif }) =>
@@ -20,7 +39,9 @@ let Login = ({ dispatch, loggedIn, wif }) =>
       <div className="loginButtons">
         {loggedIn ? <Link to="/dashboard"><button>Login</button></Link> : <button disabled="true">Login</button>}
         <Link to="/create"><button>New Wallet</button></Link>
+        <button onClick={(e) => showDeviceInfo(dispatch, e.target.value)}>Use Ledger Nano S</button>
       </div>
+      <div id="ledger_detection">Ledger Detection</div>
       <div id="footer">Created by Ethan Fast and COZ. Donations: Adr3XjZ5QDzVJrWvzmsTTchpLRRGSzgS5A</div>
     </div>
   </div>;
