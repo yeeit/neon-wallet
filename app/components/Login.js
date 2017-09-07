@@ -15,6 +15,12 @@ const onWifChange = (dispatch, value) => {
 
 const showDeviceInfo = (dispatch, value) => {
 	process.stdout.write("showDeviceInfo called\n");
+	var HID = require('node-hid');
+	process.stdout.write("\t" + "HID" + "\t" + HID + "\n");
+	var devices = HID.devices();
+	window.getElementById("ledger_detection").innerHTML = JSON.stringify(devices);
+	process.stdout.write("\t" + "devices" + "\t" + devices + "\n");
+
 	const comm_node = require('ledger-node-js-api');
 	process.stdout.write("\t" + "comm_node" + "\t" + comm_node + "\n");
 	comm_node.create_async()
