@@ -34,11 +34,12 @@ class TransactionHistory extends Component {
       <ul id="transactionList">
         {this.props.transactions.map((t) => {
           let formatAmount;
-          if (t.type === "NEO"){ formatAmount = parseInt(t.amount); }
-          else{ formatAmount = parseFloat(t.amount).toPrecision(5); }
-          // ignore precision rounding errors for GAS
-          if ((formatAmount > 0 && formatAmount < 0.001) || (formatAmount < 0 && formatAmount > -0.001)){
-            formatAmount = 0.0.toPrecision(5);
+          if (t.type === "NEO"){
+        	  	formatAmount = parseInt(t.amount);
+        	  }
+          else{
+        	  	formatAmount = parseFloat(t.amount).toFixed(5);
+        	  	
           }
           return (<li key={t.txid}>
               <div className="txid" onClick={() => openExplorer(getExplorerLink(this.props.net, t.txid))}>
