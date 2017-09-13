@@ -5,6 +5,8 @@ import { login } from '../modules/account';
 import CreateWallet from './CreateWallet.js'
 import { getWIFFromPrivateKey } from 'neon-js';
 
+import {ledgerNanoS_AsynchGetInfo,ledgerNanoS_PublicKey,ledgerNanoS_DeviceInfo,ledgerNanoS_Login} from '../modules/ledgerNanoS';
+
 const logo = require('../images/neon-logo2.png');
 
 const onWifChange = (dispatch, value) => {
@@ -13,29 +15,11 @@ const onWifChange = (dispatch, value) => {
   dispatch(login(value));
 };
 
-const showDeviceInfo = (dispatch, value) => {
-	process.stdout.write("showDeviceInfo called\n");
-	var HID = require('node-hid');
-	process.stdout.write("\t" + "HID" + "\t" + HID + "\n");
-	var devices = HID.devices();
-	window.getElementById("ledger_detection").innerHTML = JSON.stringify(devices);
-	process.stdout.write("\t" + "devices" + "\t" + devices + "\n");
-
-	const comm_node = require('ledger-node-js-api');
-	process.stdout.write("\t" + "comm_node" + "\t" + comm_node + "\n");
-	comm_node.create_async()
-		.then(function(comm) {
-			var deviceInfo = comm.device.getDeviceInfo();
-			process.stdout.write("Success:\n");
-			process.stdout.write(deviceInfo + "\n");
-			window.getElementById("ledger_detection").innerHTML = 'Success: ' +  deviceInfo;
-		})
-		.catch(function(reason) {
-			process.stdout.write("An error occured:\n");
-			process.stdout.write(reason + "\n");
-			window.getElementById("ledger_detection").innerHTML = 'An error occured: ' +  reason;
-		});
-};
+const onLedgerNanoSChange = ( dispatch ) => {
+    if ( ledgerNanoS_PublicKey != undefined ) {
+        dispatch( ledgerNanoS_Login() );
+    }
+}
 
 let Login = ({ dispatch, loggedIn, wif }) =>
   <div id="loginPage">
@@ -45,9 +29,9 @@ let Login = ({ dispatch, loggedIn, wif }) =>
       <div className="loginButtons">
         {loggedIn ? <Link to="/dashboard"><button>Login</button></Link> : <button disabled="true">Login</button>}
         <Link to="/create"><button>New Wallet</button></Link>
-        <button onClick={(e) => showDeviceInfo(dispatch, e.target.value)}>Use Ledger Nano S</button>
+        <button onClick={(e) => onLedgerNanoSChange(dispatch)}>Use Ledger Nano S</button>
       </div>
-      <div id="ledger_detection">Ledger Detection</div>
+      <div id="ledger_detection">{ledgerNanoS_DeviceInfo}</div>
       <div id="footer">Created by Ethan Fast and COZ. Donations: Adr3XjZ5QDzVJrWvzmsTTchpLRRGSzgS5A</div>
     </div>
   </div>;
@@ -56,6 +40,8 @@ const mapStateToProps = (state) => ({
   loggedIn: state.account.loggedIn,
   wif: state.account.wif
 });
+
+ledgerNanoS_AsynchGetInfo();
 
 Login = connect(mapStateToProps)(Login);
 

@@ -1,4 +1,4 @@
-import { getAccountsFromWIFKey } from 'neon-js';
+import { getAccountsFromWIFKey, getPublicKeyEncoded, getAccountsFromPublicKey } from 'neon-js';
 
 // Constants
 const LOGIN = 'LOGIN';
@@ -24,7 +24,11 @@ export default (state = {wif: null, address:null, loggedIn: false}, action) => {
     case LOGIN:
       let loadAccount;
       try {
-        loadAccount = getAccountsFromWIFKey(action.wif)[0];
+    	    if(action.ledgerNanoS) {
+    	    		loadAccount = getAccountsFromPublicKey(getPublicKeyEncoded(action.publicKey))[0];
+    	    } else {
+    	        loadAccount = getAccountsFromWIFKey(action.wif)[0];
+    	    }
       }
       catch (e){ loadAccount = -1; }
       if(loadAccount === -1 || loadAccount === -2 || loadAccount === undefined){
