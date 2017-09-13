@@ -1,5 +1,7 @@
 import comm_node from 'ledger-node-js-api';
 
+import { verifyAddress, neoId, gasId, getPublicKeyEncoded, getAccountsFromPublicKey, getAccountsFromWIFKey, getBalance, transferTransaction } from 'neon-js';
+
 export var ledgerNanoS_PublicKey = undefined;
 
 export var ledgerNanoS_PublicKeyInfo = undefined;
@@ -104,3 +106,191 @@ const getPublicKeyInfo = function( resolve, reject ) {
     process.stdout.write( "success getPublicKeyInfo  \n" );
 };
 
+export const ledgerNanoS_doSendAsset = asynch ( net, toAddress, fromWif, assetType, amount, signatureDataFn ) => {
+    process.stdout.write( "started ledgerNanoS_doSendAsset \n" );
+    let assetId, assetName, assetSymbol;
+    if ( assetType === "Neo" ) {
+        assetId = neoId;
+    } else {
+        assetId = gasId;
+    }
+
+    var fromAccount;
+    if ( fromWif == undefined ) {
+        const publicKey = ledgerNanoS_PublicKey;
+        const publicKeyEncoded = getPublicKeyEncoded( publicKey );
+        fromAccount = getAccountsFromPublicKey( publicKeyEncoded )[0];
+    } else {
+        fromAccount = getAccountsFromWIFKey( fromWif )[0];
+    }
+    process.stdout.write( "interim ledgerNanoS_doSendAsset fromAccount \"" + JSON.stringify(fromAccount) + "\" \n" );
+
+    return getBalance( net, fromAccount.address ).then(( response ) => {
+        process.stdout.write( "interim ledgerNanoS_doSendAsset getBalance response \"" + JSON.stringify(response) + "\" \n" );
+        
+        const coinsData = {
+            "assetid": assetId,
+            "list": response.unspent[assetType],
+            "balance": response[assetType],
+            "name": assetType
+        }
+        process.stdout.write( "interim ledgerNanoS_doSendAsset transferTransaction \n" );
+
+        const txData = transferTransaction( coinsData, fromAccount.publickeyEncoded, toAddress, amount );
+        
+        process.stdout.write( "interim ledgerNanoS_doSendAsset txData \"" + txData + "\" \n" );
+
+        var sign;
+        if ( signatureDataFn == undefined ) {
+            sign = signatureData( txData, account.privatekey );
+        } else {
+            process.stdout.write( "interim ledgerNanoS_doSendAsset signatureDataFn \"" + signatureDataFn + "\" \n" );
+            sign = await signatureDataFn( txData );
+        }
+        
+        process.stdout.write( "interim ledgerNanoS_doSendAsset sign \"" + sign + "\" \n" );
+
+        const txRawData = addContract( txData, sign, fromAccount.publickeyEncoded );
+        return queryRPC( net, "sendrawtransaction", [txRawData], 4 );
+    } );
+};
+
+export const ledgerNanoS_CreateSignature = async function( txData ) {
+    process.stdout.write( "started ledgerNanoS_CreateSignature \"" + txData + "\" \n" );
+    try {
+	    var signature = await new Promise(function( resolve, reject ) {
+	        createSignatureAsynch(resolve, reject, txData );
+	    } );
+    } catch(error) {
+        process.stdout.write( "success ledgerNanoS_CreateSignature error:\""+error+"\" \n" );
+        return;
+    }
+    process.stdout.write( "success ledgerNanoS_CreateSignature txData:\""+txData+"\" \n" );
+    process.stdout.write( "success ledgerNanoS_CreateSignature signature:\""+signature+"\" \n" );
+    return signature;
+}
+
+const createSignatureAsynch = function(resolve, reject, txData ) {
+    var signatureInfo = "Ledger Signing Text of Length [" + txData.length + "], Please Confirm Using the Device's Buttons. " + txData;
+
+    process.stdout.write( signatureInfo + "\n" );
+
+    var validStatus = [0x9000];
+
+    var messages = [];
+
+    let bufferSize = 254;
+    let offset = 0;
+    while ( offset < txData.length ) {
+        let chunk;
+        let p1;
+        if ( ( txData.length - offset ) > bufferSize ) {
+            chunk = txData.substring( offset, offset + bufferSize );
+        } else {
+            chunk = txData.substring( offset );
+        }
+        if ( ( offset + chunk.length ) == txData.length ) {
+            p1 = "80";
+        } else {
+            p1 = "00";
+        }
+
+        let chunkLength = chunk.length;
+
+        process.stdout.write( "Ledger Signature chunkLength " + chunkLength + "\n" );
+
+        let chunkLengthHex = chunkLength.toString( 16 );
+        while ( chunkLengthHex.length < 2 ) {
+            chunkLengthHex = "0" + chunkLengthHex;
+        }
+
+        process.stdout.write( "Ledger Signature chunkLength hex " + chunkLengthHex + "\n" );
+
+        messages.push( "8002" + p1 + "00" + chunkLengthHex + chunk );
+        offset += chunk.length;
+    }
+
+    comm_node.create_async( 0, false ).then( function( comm ) {
+        for ( let ix = 0; ix < messages.length; ix++ ) {
+            let message = messages[ix];
+            process.stdout.write( "Ledger Message (" + ix + "/" + messages.length + ") " + message + "\n" );
+
+            comm.exchange( message, validStatus ).then( function( response ) {
+                process.stdout.write( "Ledger Signature Response " + response + "\n" );
+                if ( response != "9000" ) {
+                    comm.device.close();
+
+                    /**
+					 * https://stackoverflow.com/questions/25829939/specification-defining-ecdsa-signature-data <br>
+					 * the signature is TLV encoded. the first byte is 30, the "signature" type<br>
+					 * the second byte is the length (always 44)<br>
+					 * the third byte is 02, the "number: type<br>
+					 * the fourth byte is the length of R (always 20)<br>
+					 * the byte after the encoded number is 02, the "number: type<br>
+					 * the byte after is the length of S (always 20)<br>
+					 * <p>
+					 * eg:
+					 * 304402200262675396fbcc768bf505c9dc05728fd98fd977810c547d1a10c7dd58d18802022069c9c4a38ee95b4f394e31a3dd6a63054f8265ff9fd2baf68a9c4c3aa8c5d47e9000
+					 * is
+					 * 30LL0220RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR0220SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+					 */
+
+                    let rLenHex = response.substring( 6, 8 );
+                    // process.stdout.write( "Ledger Signature rLenHex " + rLenHex + "\n" );
+                    let rLen = parseInt( rLenHex, 16 ) * 2;
+                    // process.stdout.write( "Ledger Signature rLen " + rLen + "\n" );
+                    let rStart = 8;
+                    // process.stdout.write( "Ledger Signature rStart " + rStart + "\n" );
+                    let rEnd = rStart + rLen;
+                    // process.stdout.write( "Ledger Signature rEnd " + rEnd + "\n" );
+
+                    while ( response.substring( rStart, rStart + 2 ) == "00" ) {
+                        rStart += 2;
+                    }
+
+                    let r = response.substring( rStart, rEnd );
+                    process.stdout.write( "Ledger Signature R [" + rStart + "," + rEnd + "] " + r + "\n" );
+                    let sLenHex = response.substring( rEnd + 2, rEnd + 4 );
+                    // process.stdout.write( "Ledger Signature sLenHex " + sLenHex + "\n" );
+                    let sLen = parseInt( sLenHex, 16 ) * 2;
+                    // process.stdout.write( "Ledger Signature sLen " + sLen + "\n" );
+                    let sStart = rEnd + 4;
+                    // process.stdout.write( "Ledger Signature sStart " + sStart + "\n" );
+                    let sEnd = sStart + sLen;
+                    // process.stdout.write( "Ledger Signature sEnd " + sEnd + "\n" );
+
+                    while ( response.substring( sStart, sStart + 2 ) == "00" ) {
+                        sStart += 2;
+                    }
+
+                    let s = response.substring( sStart, sEnd );
+                    process.stdout.write( "Ledger Signature S [" + sStart + "," + sEnd + "] " + s + "\n" );
+
+                    let msgHashStart = sEnd + 4;
+                    let msgHashEnd = msgHashStart + 64;
+                    let msgHash = response.substring( msgHashStart, msgHashEnd );
+                    process.stdout.write( "Ledger Signature msgHash [" + msgHashStart + "," + msgHashEnd + "] " + msgHash + "\n" );
+
+                    let signature = r + s;
+                    let signatureInfo = "Signature of Length [" + signature.length + "] : " + signature;
+                    process.stdout.write( signatureInfo + "\n" );
+
+
+                    resolve( signatureInfo );
+                }
+            } )
+                .catch( function( reason ) {
+                    comm.device.close();
+                    signatureInfo = "An error occured[1]: " + reason;
+                    process.stdout.write( "Signature Reponse " + signatureInfo + "\n" );
+                    resolve( signatureInfo );
+                } );
+        }
+    } )
+        .catch( function( reason ) {
+            comm.device.close();
+            signatureInfo = "An error occured[2]: " + reason;
+            process.stdout.write( "Signature Reponse " + signatureInfo + "\n" );
+            resolve( signatureInfo );
+        } );
+}

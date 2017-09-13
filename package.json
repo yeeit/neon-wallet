@@ -64,7 +64,7 @@
     "js-scrypt": "^0.2.0",
     "lodash": "^4.17.4",
 	"ledger-node-js-api": "git+https://github.com/coranos/ledger-node-js-api.git#1.1.4",
-	"neon-js": "git+https://github.com/coranos/neon-js.git#1.0.3",
+	"neon-js": "git+https://github.com/coranos/neon-js.git#1.0.4",
     "qrcode": "^0.8.2",
     "react": "^15.0.2",
     "react-ace": "^5.0.1",
