@@ -6,7 +6,7 @@
   "author": "Ethan Fast <ejhfast@gmail.com> (https://github.com/Ejhfast)",
   "scripts": {
     "postinstall": "install-app-deps",
-    "start": "electron .",
+	"start": "electron . --enable-logging --remote-debugging-port=9222",
     "test": "jest",
     "test-watch": "jest --watch",
     "pack": "build --dir",

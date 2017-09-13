@@ -19,7 +19,7 @@ A standalone app will be available soon. For now, you will need to build the wal
 ### Developing and Running
 
 Execute these commands in the project's root directory:
-	https://github.com/node-hid/node-hid/issues/167
+	export DEBUG=express:*
 	export npm_config_runtime=electron
 	export npm_config_build_from_source=true
   - `npm install` Installing node dependencies
