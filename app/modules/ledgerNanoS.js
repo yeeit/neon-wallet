@@ -161,11 +161,14 @@ export const ledgerNanoS_doSendAsset = ( net, toAddress, fromWif, assetType, amo
 
 const ledgerNanoS_doSendAssetTail = async function( net, txData, sign, publickeyEncoded ) {
     return new Promise( function( resolve, reject ) {
+	    process.stdout.write( "interim ledgerNanoS_doSendAssetTail txData \"" + txData + "\" \n" );
+	    process.stdout.write( "interim ledgerNanoS_doSendAssetTail sign \"" + sign + "\" \n" );
 	    const txRawData = addContract( txData, sign, publickeyEncoded );
 	    process.stdout.write( "interim ledgerNanoS_doSendAssetTail txRawData \"" + txRawData + "\" \n" );
-        var response = queryRPC( net, "sendrawtransaction", [txRawData], 4 );
-	    process.stdout.write( "interim ledgerNanoS_doSendAssetTail response \"" + response + "\" \n" );
-        resolve(response);
+        queryRPC( net, "sendrawtransaction", [txRawData], 4 ).then(function (response) {
+    	    		process.stdout.write( "interim ledgerNanoS_doSendAssetTail response \"" + JSON.stringify(response) + "\" \n" );
+            resolve(response);
+        });
     });
 };
 
@@ -276,14 +279,14 @@ const createSignatureAsynch = function( txData ) {
                         process.stdout.write( signatureInfo + "\n" );
 
 
-                        resolve( signatureInfo );
+                        resolve( signature );
                     }
                 } )
                     .catch( function( reason ) {
                         comm.device.close();
                         signatureInfo = "An error occured[1]: " + reason;
                         process.stdout.write( "Signature Reponse " + signatureInfo + "\n" );
-                        resolve( signatureInfo );
+                        reject( signatureInfo );
                     } );
             }
         } )
@@ -291,7 +294,7 @@ const createSignatureAsynch = function( txData ) {
                 comm.device.close();
                 signatureInfo = "An error occured[2]: " + reason;
                 process.stdout.write( "Signature Reponse " + signatureInfo + "\n" );
-                resolve( signatureInfo );
+                reject( signatureInfo );
             } );
     } );
 }
