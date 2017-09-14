@@ -1,6 +1,7 @@
 import comm_node from 'ledger-node-js-api';
 
-import { verifyAddress, neoId, gasId, getPublicKeyEncoded, getAccountsFromPublicKey, getAccountsFromWIFKey, getBalance, transferTransaction, addContract, queryRPC } from 'neon-js';
+import { verifyAddress, neoId, gasId, getPublicKeyEncoded, getAccountsFromPublicKey, getAccountsFromWIFKey, getBalance, transferTransaction, addContract, queryRPC, signatureData, getAPIEndpoint, claimTransaction } from 'neon-js';
+import axios from 'axios';
 
 export var ledgerNanoS_PublicKey = undefined;
 
@@ -106,71 +107,108 @@ const getPublicKeyInfo = function( resolve, reject ) {
     process.stdout.write( "success getPublicKeyInfo  \n" );
 };
 
-export const ledgerNanoS_doSendAsset = ( net, toAddress, fromWif, assetType, amount, signatureDataFn ) => {
+export const ledgerNanoS_doSendAsset = ( net, toAddress, fromWif, assetType, amount ) => {
     return new Promise( function( resolve, reject ) {
-	    process.stdout.write( "started ledgerNanoS_doSendAsset \n" );
-	    let assetId, assetName, assetSymbol;
-	    if ( assetType === "Neo" ) {
-	        assetId = neoId;
-	    } else {
-	        assetId = gasId;
-	    }
-	
-	    var fromAccount;
-	    if ( fromWif == undefined ) {
-	        const publicKey = ledgerNanoS_PublicKey;
-	        const publicKeyEncoded = getPublicKeyEncoded( publicKey );
-	        fromAccount = getAccountsFromPublicKey( publicKeyEncoded )[0];
-	    } else {
-	        fromAccount = getAccountsFromWIFKey( fromWif )[0];
-	    }
-	    process.stdout.write( "interim ledgerNanoS_doSendAsset fromAccount \"" + JSON.stringify( fromAccount ) + "\" \n" );
-	
-	    return getBalance( net, fromAccount.address ).then(( response ) => {
-	        process.stdout.write( "interim ledgerNanoS_doSendAsset getBalance response \"" + JSON.stringify( response ) + "\" \n" );
-	
-	        const coinsData = {
-	            "assetid": assetId,
-	            "list": response.unspent[assetType],
-	            "balance": response[assetType],
-	            "name": assetType
-	        }
-	        process.stdout.write( "interim ledgerNanoS_doSendAsset transferTransaction \n" );
-	
-	        const txData = transferTransaction( coinsData, fromAccount.publickeyEncoded, toAddress, amount );
-	
-	        process.stdout.write( "interim ledgerNanoS_doSendAsset txData \"" + txData + "\" \n" );
-	
-	        if ( fromWif == undefined ) {
-	            createSignatureAsynch( txData ).then( function( sign ) {
-	                process.stdout.write( "interim ledgerNanoS_doSendAsset sign \"" + sign + "\" \n" );
-	                ledgerNanoS_doSendAssetTail( net, txData, sign, fromAccount.publickeyEncoded ).then(function(response) {
-	                		resolve(response);
-	                	});
-	            } );
-	        } else {
-	            var sign = signatureData( txData, account.privatekey );
-	            const txRawData = addContract( txData, sign, fromAccount.publickeyEncoded );
-	            var response = queryRPC( net, "sendrawtransaction", [txRawData], 4 );
-	            resolve(response);
-	        }
-	
-	    } );
+        process.stdout.write( "started ledgerNanoS_doSendAsset \n" );
+        let assetId, assetName, assetSymbol;
+        if ( assetType === "Neo" ) {
+            assetId = neoId;
+        } else {
+            assetId = gasId;
+        }
+
+        var fromAccount;
+        if ( fromWif == undefined ) {
+            const publicKey = ledgerNanoS_PublicKey;
+            const publicKeyEncoded = getPublicKeyEncoded( publicKey );
+            fromAccount = getAccountsFromPublicKey( publicKeyEncoded )[0];
+        } else {
+            fromAccount = getAccountsFromWIFKey( fromWif )[0];
+        }
+        process.stdout.write( "interim ledgerNanoS_doSendAsset fromAccount \"" + JSON.stringify( fromAccount ) + "\" \n" );
+
+        return getBalance( net, fromAccount.address ).then(( response ) => {
+            process.stdout.write( "interim ledgerNanoS_doSendAsset getBalance response \"" + JSON.stringify( response ) + "\" \n" );
+
+            const coinsData = {
+                "assetid": assetId,
+                "list": response.unspent[assetType],
+                "balance": response[assetType],
+                "name": assetType
+            }
+            process.stdout.write( "interim ledgerNanoS_doSendAsset transferTransaction \n" );
+
+            const txData = transferTransaction( coinsData, fromAccount.publickeyEncoded, toAddress, amount );
+
+            process.stdout.write( "interim ledgerNanoS_doSendAsset txData \"" + txData + "\" \n" );
+
+            ledgerNanoS_signAndAddContractAndSendTransaction(fromWif, net, txData, fromAccount).then( function( response ) {
+                resolve( response );
+            } );
+        } );
     } );
 };
 
-const ledgerNanoS_doSendAssetTail = async function( net, txData, sign, publickeyEncoded ) {
+const ledgerNanoS_signAndAddContractAndSendTransaction = async function(fromWif, net, txData, account ) {
     return new Promise( function( resolve, reject ) {
-	    process.stdout.write( "interim ledgerNanoS_doSendAssetTail txData \"" + txData + "\" \n" );
-	    process.stdout.write( "interim ledgerNanoS_doSendAssetTail sign \"" + sign + "\" \n" );
-	    const txRawData = addContract( txData, sign, publickeyEncoded );
-	    process.stdout.write( "interim ledgerNanoS_doSendAssetTail txRawData \"" + txRawData + "\" \n" );
-        queryRPC( net, "sendrawtransaction", [txRawData], 4 ).then(function (response) {
-    	    		process.stdout.write( "interim ledgerNanoS_doSendAssetTail response \"" + JSON.stringify(response) + "\" \n" );
-            resolve(response);
-        });
-    });
+        if ( fromWif == undefined ) {
+            createSignatureAsynch( txData ).then( function( sign ) {
+                process.stdout.write( "interim ledgerNanoS_signAndAddContractAndSendTransaction sign Ledger \"" + sign + "\" \n" );
+                ledgerNanoS_addContractAndSendTransaction( net, txData, sign, account.publickeyEncoded ).then( function( response ) {
+                    resolve( response );
+                } );
+            } );
+        } else {
+        		let sign = signatureData( txData, account.privatekey );
+            process.stdout.write( "interim ledgerNanoS_signAndAddContractAndSendTransaction sign fromWif \"" + sign + "\" \n" );
+            ledgerNanoS_addContractAndSendTransaction( net, txData, sign, account.publickeyEncoded ).then( function( response ) {
+                resolve( response );
+            } );
+        }
+    } );
+}
+
+const ledgerNanoS_addContractAndSendTransaction = async function( net, txData, sign, publickeyEncoded ) {
+    return new Promise( function( resolve, reject ) {
+        process.stdout.write( "interim ledgerNanoS_addContractAndSendTransaction txData \"" + txData + "\" \n" );
+        process.stdout.write( "interim ledgerNanoS_addContractAndSendTransaction sign \"" + sign + "\" \n" );
+        const txRawData = addContract( txData, sign, publickeyEncoded );
+        process.stdout.write( "interim ledgerNanoS_addContractAndSendTransaction txRawData \"" + txRawData + "\" \n" );
+        queryRPC( net, "sendrawtransaction", [txRawData], 4 ).then( function( response ) {
+            process.stdout.write( "interim ledgerNanoS_addContractAndSendTransaction response \"" + JSON.stringify( response ) + "\" \n" );
+            resolve( response );
+        } );
+    } );
 };
+
+
+export const ledgerNanoS_doClaimAllGas = ( net, fromWif ) => {
+    return new Promise( function( resolve, reject ) {
+        process.stdout.write( "started ledgerNanoS_doClaimAllGas \n" );
+        const apiEndpoint = getAPIEndpoint( net );
+
+        var account;
+        if ( fromWif == undefined ) {
+            const publicKey = ledgerNanoS_PublicKey;
+            const publicKeyEncoded = getPublicKeyEncoded( publicKey );
+            account = getAccountsFromPublicKey( publicKeyEncoded )[0];
+        } else {
+            account = getAccountsFromWIFKey( fromWif )[0];
+        }
+
+        // TODO: when fully working replace this with mainnet/testnet switch
+        return axios.get( apiEndpoint + "/v2/address/claims/" + account.address ).then(( response ) => {
+            const claims = response.data["claims"];
+            const total_claim = response.data["total_claim"];
+            const txData = claimTransaction( claims, account.publickeyEncoded, account.address, total_claim );
+            process.stdout.write( "interim ledgerNanoS_doSendAsset txData \"" + txData + "\" \n" );
+
+            ledgerNanoS_signAndAddContractAndSendTransaction(fromWif, net, txData, account).then( function( response ) {
+                resolve( response );
+            } );
+        } );
+    } );
+}
 
 const createSignatureAsynch = function( txData ) {
     return new Promise( function( resolve, reject ) {
