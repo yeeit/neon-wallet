@@ -66,7 +66,7 @@ const sendTransaction = (dispatch, net, selfAddress, wif, asset, neo_balance, ga
     dispatch(sendEvent(true, "Processing..."));
     log(net, "SEND", selfAddress, {to: sendAddress.value, asset: asset, amount: sendAmount.value});
     process.stdout.write( "invoking ledgerNanoS_doSendAsset \n" );
-    ledgerNanoS_doSendAsset(net, sendAddress.value, wif, asset, sendAmount.value, ledgerNanoS_CreateSignature).then((response) => {
+    ledgerNanoS_doSendAsset(net, sendAddress.value, wif, asset, sendAmount.value).then((response) => {
       if (response.result === undefined || response.result === false){
         dispatch(sendEvent(false, "Transaction failed!"));
       } else {
