@@ -8,7 +8,7 @@ module.exports = {
   devtool : 'eval-source-map',
   target : 'electron',
   entry : [ 'webpack-dev-server/client?http://localhost:3000', 'webpack/hot/only-dev-server', 'react-hot-loader/patch', path.join(__dirname, 'app/index.js') ],
-  externals : [ 'neon-js', 'ledger-node-js-api', 'node-hid' ],
+  externals : [ "neon-js', 'ledger-node-js-api',  'node-hid' ],
   output : {
     path : path.join(__dirname, 'app/dist/'),
     filename : 'bundle.js',
